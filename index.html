@@ -1,0 +1,496 @@
+﻿<!DOCTYPE html>
+<html lang="pa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App with 600KB Auto-Compress & Long Press</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f2f5; padding: 15px; margin: 0; font-size: 14px; user-select: none; }
+        .window-view { display: none; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 950px; margin: 0 auto; }
+        .active-window { display: block; }
+        
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+        .header h2 { margin: 0; font-size: 1.2em; }
+        .header-actions { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        
+        .btn-container { display: flex; flex-wrap: wrap; gap: 10px; }
+        
+        .button-row { display: flex; align-items: center; gap: 8px; width: 100%; cursor: grab; background: #fff; border-radius: 4px; padding: 2px; transition: box-shadow 0.2s; }
+        .button-row:active { cursor: grabbing; }
+        .button-row.dragging { opacity: 0.4; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+
+        @media (min-width: 768px) { .button-row { width: calc(50% - 5px); } }
+
+        .main-btn { flex-grow: 1; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 15px; text-align: left; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+        .main-btn:hover { filter: brightness(0.9); }
+        
+        .tiny-btn { background-color: #28a745; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; padding: 0; }
+        
+        .back-btn { background-color: #6c757d; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+
+        .action-btn { color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .download-btn { background-color: #ff9800; } 
+        .upload-btn { background-color: #17a2b8; } 
+        .reset-btn { background-color: #dc3545; } 
+
+        #level4-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        @media (max-width: 850px) { #level4-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { #level4-container { grid-template-columns: 1fr; } }
+
+        .profile-card { border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+        .profile-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .profile-header input[type="file"] { font-size: 11px; width: 140px; }
+
+        .tiny-upload-btn { background: #f8f9fa; border: 1px solid #ccc; font-size: 16px; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        .tiny-upload-btn:hover { background: #e2e6ea; }
+        .tiny-img { width: 42px; height: 42px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; display: none; }
+        .tiny-img:hover { transform: scale(1.05); }
+
+        .small-box { display: flex; flex-direction: column; flex-grow: 1; min-width: 90px; }
+        .small-box label, .input-group label { font-size: 11px; font-weight: bold; color: #444; margin-bottom: 2px; }
+        .small-box input[type="text"], .input-group input[type="text"] { width: 100%; padding: 4px 6px; box-sizing: border-box; border-radius: 3px; border: 1px solid #ccc; font-size: 12px; height: 26px; }
+
+        .bio-inputs { display: flex; flex-wrap: wrap; gap: 8px; }
+        .input-group { display: flex; flex-direction: column; width: 48%; flex: 1 1 45%; }
+
+        .card-actions { display: flex; justify-content: flex-end; gap: 5px; border-top: 1px solid #eee; padding-top: 5px; margin-top: 2px; }
+        .card-btn { padding: 4px 8px; font-size: 12px; cursor: pointer; border: none; border-radius: 3px; color: white; }
+        .btn-copy { background-color: #17a2b8; } 
+        .btn-del { background-color: #dc3545; } 
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
+        .modal-content { max-width: 90%; max-height: 90%; border-radius: 8px; }
+        .close { position: absolute; top: 20px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; }
+        
+        .action-modal-box { background: white; padding: 20px; border-radius: 8px; width: 250px; text-align: center; }
+        .action-modal-btn { width: 100%; margin-bottom: 10px; padding: 10px; font-size: 15px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <input type="file" id="globalReplaceImgInput" accept="image/*" style="display:none;">
+
+    <div id="window1" class="window-view active-window">
+        <div class="header">
+            <h2>ਮੁੱਖ ਬਟਨ (Level 1) <br><small style="font-size:12px; color:#666;">(ਐਡਿਟ ਕਰਨ ਲਈ ਬਟਨ ਦਬਾ ਕੇ ਰੱਖੋ)</small></h2>
+            <div class="header-actions">
+                <button class="action-btn reset-btn" onclick="resetApp()">Reset</button>
+                <input type="file" id="zip-upload" accept=".zip" style="display:none;" onchange="importFromZip(event)">
+                <button class="action-btn upload-btn" onclick="document.getElementById('zip-upload').click()">ZIP ਅੱਪਲੋਡ</button>
+                <button class="action-btn download-btn" onclick="exportToZip()">ZIP ਡਾਊਨਲੋਡ</button>
+                <button class="tiny-btn" onclick="addLevel1Button()">+</button>
+            </div>
+        </div>
+        <div id="level1-container" class="btn-container"></div>
+    </div>
+
+    <div id="window2" class="window-view">
+        <div class="header">
+            <button class="back-btn" onclick="goBack(1)">&#8592; Back</button>
+            <h2 id="window2-title">ਸਬ-ਬਟਨ (Level 2)</h2>
+            <button class="tiny-btn" onclick="addLevel2Button()">+</button>
+        </div>
+        <div id="level2-container" class="btn-container"></div>
+    </div>
+
+    <div id="window3" class="window-view">
+        <div class="header">
+            <button class="back-btn" onclick="goBack(2)">&#8592; Back</button>
+            <h2 id="window3-title">ਤੀਜਾ ਸਟੈੱਪ (Level 3)</h2>
+            <button class="tiny-btn" onclick="addLevel3Button()">+</button>
+        </div>
+        <div id="level3-container" class="btn-container"></div>
+    </div>
+
+    <div id="window4" class="window-view">
+        <div class="header">
+            <button class="back-btn" onclick="goBack(3)">&#8592; Back</button>
+            <h2 id="window4-title">ਫੋਟੋ ਅਤੇ ਡਾਟਾ</h2>
+            <button class="tiny-btn" onclick="addImageProfile()">+</button>
+        </div>
+        <div id="level4-container"></div> 
+    </div>
+
+    <div id="imageModal" class="modal" onclick="closeModal(event)">
+        <span class="close" onclick="closeModal(event)">&times;</span>
+        <img class="modal-content" id="fullImg">
+    </div>
+
+    <div id="actionMenuModal" class="modal" onclick="closeActionMenu(event)">
+        <div class="action-modal-box" onclick="event.stopPropagation()">
+            <h3 id="actionMenuTitle" style="margin-top:0;">ਆਪਸ਼ਨ ਚੁਣੋ</h3>
+            <button class="action-modal-btn" style="background:#007bff;" id="actEdit">✏️ ਐਡਿਟ (Edit)</button>
+            <button class="action-modal-btn" style="background:#17a2b8;" id="actCopy">📄 ਕਾਪੀ (Copy)</button>
+            <button class="action-modal-btn" style="background:#dc3545; margin-bottom:0;" id="actDel">❌ ਡਿਲੀਟ (Delete)</button>
+        </div>
+    </div>
+
+    <div id="imgActionMenuModal" class="modal" onclick="closeImgActionMenu(event)">
+        <div class="action-modal-box" onclick="event.stopPropagation()">
+            <h3 style="margin-top:0;">ਫੋਟੋ ਆਪਸ਼ਨ</h3>
+            <button class="action-modal-btn" style="background:#007bff;" id="actImgReplace">🖼️ ਫੋਟੋ ਬਦਲੋ (Replace)</button>
+            <button class="action-modal-btn" style="background:#dc3545; margin-bottom:0;" id="actImgDel">🗑️ ਫੋਟੋ ਹਟਾਓ (Delete)</button>
+        </div>
+    </div>
+
+    <script>
+        let appData = {};
+        let currentL1Id = null, currentL2Id = null, currentL3Id = null;
+        let db;
+
+        const buttonColors = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#469990', '#9A6324', '#800000', '#000075', '#008080', '#e6beff', '#aaffc3', '#808000', '#ffd8b1'];
+        function getRandomColor() { return buttonColors[Math.floor(Math.random() * buttonColors.length)]; }
+        function generateId() { return '_' + Math.random().toString(36).substr(2, 9); }
+
+        const request = indexedDB.open("BioDataPermanentDB", 1);
+        request.onupgradeneeded = function(e) { db = e.target.result; db.createObjectStore("store"); };
+        request.onsuccess = function(e) { db = e.target.result; loadFromLocal(); };
+
+        function saveToLocal() { if(!db) return; db.transaction("store", "readwrite").objectStore("store").put(appData, "appData"); }
+        function loadFromLocal() {
+            let req = db.transaction("store", "readonly").objectStore("store").get("appData");
+            req.onsuccess = function() { if (req.result) appData = req.result; renderLevel1(); };
+        }
+
+        function cloneNode(node, level) {
+            let cloned = { name: node.name + " (Copy)", color: node.color || getRandomColor(), thumbData: node.thumbData, fullImgData: node.fullImgData };
+            if (node.imageId) cloned.imageId = generateId();
+            if (level === 1) { cloned.subButtons = {}; for (let k in node.subButtons) cloned.subButtons[generateId()] = cloneNode(node.subButtons[k], 2); } 
+            else if (level === 2) { cloned.subSubButtons = {}; for (let k in node.subSubButtons) cloned.subSubButtons[generateId()] = cloneNode(node.subSubButtons[k], 3); } 
+            else if (level === 3) { cloned.profiles = JSON.parse(JSON.stringify(node.profiles)); cloned.profiles.forEach(p => p.imageId = generateId()); }
+            return cloned;
+        }
+
+        // --- New: Compress Image to < 600KB ---
+        function compressImageTo600KB(file, callback) {
+            const TARGET_SIZE = 614400; // 600KB in bytes
+            if (file.size <= TARGET_SIZE) {
+                let reader = new FileReader(); reader.onload = (e) => callback(e.target.result); reader.readAsDataURL(file); return;
+            }
+            let reader = new FileReader();
+            reader.onload = function(event) {
+                let img = new Image();
+                img.onload = function() {
+                    let canvas = document.createElement("canvas"); let ctx = canvas.getContext("2d");
+                    let scaleRatio = Math.sqrt(TARGET_SIZE / file.size);
+                    canvas.width = img.width * scaleRatio; canvas.height = img.height * scaleRatio;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    let quality = 0.9; let dataUrl = canvas.toDataURL("image/jpeg", quality);
+                    
+                    // 600KB in base64 is approx 820,000 characters
+                    while (dataUrl.length > 820000 && quality > 0.1) { 
+                        quality -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", quality); 
+                    }
+                    callback(dataUrl);
+                }; img.src = event.target.result;
+            }; reader.readAsDataURL(file);
+        }
+
+        function generateThumbnail(base64Image, callback) {
+            let img = new Image();
+            img.onload = function() {
+                let canvas = document.createElement("canvas"); let ctx = canvas.getContext("2d");
+                let scale = Math.min(80 / img.width, 80 / img.height);
+                canvas.width = img.width * scale; canvas.height = img.height * scale;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                let quality = 0.8; let dataUrl = canvas.toDataURL("image/jpeg", quality);
+                while (dataUrl.length > 9300 && quality > 0.1) { quality -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", quality); }
+                callback(dataUrl);
+            }; img.src = base64Image;
+        }
+
+        // --- Long Press Logic ---
+        function addLongPress(element, onLongPress, onClick) {
+            let timer; let isDragging = false;
+            function startPress(e) {
+                if (e.type === 'mousedown' && e.button !== 0) return;
+                isDragging = false;
+                timer = setTimeout(() => { isDragging = true; onLongPress(e); }, 500);
+            }
+            function cancelPress() { clearTimeout(timer); isDragging = true; }
+            function endPress(e) { clearTimeout(timer); if (!isDragging && onClick) onClick(e); isDragging = false; }
+
+            element.addEventListener('mousedown', startPress); element.addEventListener('touchstart', startPress, {passive: true});
+            element.addEventListener('mouseup', endPress); element.addEventListener('touchend', endPress);
+            element.addEventListener('mousemove', cancelPress); element.addEventListener('touchmove', cancelPress, {passive: true});
+            element.addEventListener('mouseleave', cancelPress);
+        }
+
+        // --- Drag & Drop ---
+        let draggedRow = null;
+        function attachDragEvents(row, containerId) {
+            row.setAttribute('draggable', true);
+            row.addEventListener('dragstart', function(e) { draggedRow = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault(); const target = e.target.closest('.button-row');
+                if (target && target !== draggedRow) {
+                    const rect = target.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > .5 || (e.clientX - rect.left) / (rect.right - rect.left) > .5;
+                    target.parentNode.insertBefore(draggedRow, next && target.nextSibling || target);
+                }
+            });
+            row.addEventListener('dragend', function() { this.classList.remove('dragging'); draggedRow = null; saveNewOrder(containerId); });
+        }
+
+        function saveNewOrder(containerId) {
+            const rows = document.querySelectorAll(`#${containerId} .button-row`);
+            let newOrderIds = Array.from(rows).map(r => r.getAttribute('data-id'));
+            if (containerId === 'level1-container') { let newAppData = {}; newOrderIds.forEach(id => newAppData[id] = appData[id]); appData = newAppData; } 
+            else if (containerId === 'level2-container') { let newSubs = {}; newOrderIds.forEach(id => newSubs[id] = appData[currentL1Id].subButtons[id]); appData[currentL1Id].subButtons = newSubs; } 
+            else if (containerId === 'level3-container') { let newSubSubs = {}; newOrderIds.forEach(id => newSubSubs[id] = appData[currentL1Id].subButtons[currentL2Id].subSubButtons[id]); appData[currentL1Id].subButtons[currentL2Id].subSubButtons = newSubSubs; }
+            saveToLocal();
+        }
+
+        // --- Button Action Menu ---
+        let currentContext = null;
+        function openActionMenu(level, id, node) {
+            currentContext = { level, id, node }; document.getElementById('actionMenuTitle').textContent = node.name; document.getElementById('actionMenuModal').style.display = 'flex';
+        }
+        function closeActionMenu(e) { if (e && e.target.id !== 'actionMenuModal') return; document.getElementById('actionMenuModal').style.display = 'none'; }
+
+        document.getElementById('actEdit').onclick = () => { closeActionMenu(); let n = prompt("ਨਵਾਂ ਨਾਮ ਲਿਖੋ:", currentContext.node.name); if(n) { currentContext.node.name = n; saveToLocal(); refreshCurrentLevel(); } };
+        document.getElementById('actCopy').onclick = () => { closeActionMenu(); let c = cloneNode(currentContext.node, currentContext.level); if(currentContext.level === 1) appData[generateId()] = c; else if(currentContext.level === 2) appData[currentL1Id].subButtons[generateId()] = c; else if(currentContext.level === 3) appData[currentL1Id].subButtons[currentL2Id].subSubButtons[generateId()] = c; saveToLocal(); refreshCurrentLevel(); };
+        document.getElementById('actDel').onclick = () => { closeActionMenu(); if(confirm("ਕੀ ਤੁਸੀਂ ਇਸਨੂੰ ਡਿਲੀਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?")) { if(currentContext.level === 1) delete appData[currentContext.id]; else if(currentContext.level === 2) delete appData[currentL1Id].subButtons[currentContext.id]; else if(currentContext.level === 3) delete appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentContext.id]; saveToLocal(); refreshCurrentLevel(); } };
+
+        function refreshCurrentLevel() { if(currentContext.level === 1) renderLevel1(); else if(currentContext.level === 2) renderLevel2(); else if(currentContext.level === 3) renderLevel3(); }
+
+        // --- Image Action Menu (Replace / Delete) ---
+        let currentImageContext = null;
+        function openImgActionMenu(node, callback) {
+            currentImageContext = { node, renderCallback: callback };
+            document.getElementById('imgActionMenuModal').style.display = 'flex';
+        }
+        function closeImgActionMenu(e) {
+            if (e && e.target.id !== 'imgActionMenuModal') return;
+            document.getElementById('imgActionMenuModal').style.display = 'none';
+        }
+
+        document.getElementById('actImgReplace').onclick = () => {
+            closeImgActionMenu();
+            document.getElementById('globalReplaceImgInput').click(); 
+        };
+
+        document.getElementById('actImgDel').onclick = () => {
+            closeImgActionMenu();
+            if(confirm("ਕੀ ਤੁਸੀਂ ਇਹ ਫੋਟੋ ਹਟਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?")) {
+                currentImageContext.node.fullImgData = null;
+                currentImageContext.node.thumbData = null;
+                saveToLocal();
+                currentImageContext.renderCallback(); 
+            }
+        };
+
+        document.getElementById('globalReplaceImgInput').onchange = function(e) {
+            let file = e.target.files[0];
+            if (file && currentImageContext) {
+                compressImageTo600KB(file, function(optimizedBase64) {
+                    currentImageContext.node.fullImgData = optimizedBase64;
+                    if(!currentImageContext.node.imageId) currentImageContext.node.imageId = generateId();
+                    generateThumbnail(optimizedBase64, function(thumb) {
+                        currentImageContext.node.thumbData = thumb; 
+                        saveToLocal(); 
+                        currentImageContext.renderCallback();
+                    });
+                });
+            }
+            this.value = ''; 
+        };
+
+        // --- Render Levels ---
+        function addLevel1Button() { let name = prompt("ਨਵੇਂ ਬਟਨ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ:"); if (!name || name.trim() === "") return; appData[generateId()] = { name: name.trim(), color: getRandomColor(), subButtons: {} }; saveToLocal(); renderLevel1(); }
+        function renderLevel1() {
+            const container = document.getElementById('level1-container'); container.innerHTML = '';
+            for (let id in appData) {
+                let node = appData[id]; if(!node.color) node.color = getRandomColor();
+                let row = document.createElement('div'); row.className = 'button-row'; row.setAttribute('data-id', id); attachDragEvents(row, 'level1-container');
+                let btn = document.createElement('button'); btn.className = 'main-btn'; btn.textContent = node.name; btn.style.backgroundColor = node.color;
+                addLongPress(btn, () => openActionMenu(1, id, node), () => openWindow2(id));
+                row.appendChild(btn); container.appendChild(row);
+            }
+        }
+
+        function openWindow2(id) { currentL1Id = id; document.getElementById('window2-title').textContent = appData[id].name; goForward(2); renderLevel2(); }
+        function addLevel2Button() { let name = prompt("ਨਵੇਂ ਸਬ-ਬਟਨ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ:"); if (!name || name.trim() === "") return; appData[currentL1Id].subButtons[generateId()] = { name: name.trim(), color: getRandomColor(), subSubButtons: {} }; saveToLocal(); renderLevel2(); }
+        function renderLevel2() {
+            const container = document.getElementById('level2-container'); container.innerHTML = '';
+            let subs = appData[currentL1Id].subButtons;
+            for (let id in subs) {
+                let node = subs[id]; if(!node.color) node.color = getRandomColor();
+                let row = document.createElement('div'); row.className = 'button-row'; row.setAttribute('data-id', id); attachDragEvents(row, 'level2-container');
+
+                let imgContainer = document.createElement('div'); imgContainer.style.display = 'flex'; imgContainer.style.alignItems = 'center'; imgContainer.style.gap = '5px';
+                let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+                let uploadBtn = document.createElement('button'); uploadBtn.className = 'tiny-upload-btn'; uploadBtn.innerHTML = '📷'; uploadBtn.title = "ਫੋਟੋ ਜੋੜੋ";
+                let imgPreview = document.createElement('img'); imgPreview.className = 'tiny-img';
+                
+                if (node.thumbData) { imgPreview.src = node.thumbData; imgPreview.style.display = 'block'; uploadBtn.style.display = 'none'; }
+                
+                uploadBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
+                
+                addLongPress(imgPreview, 
+                    (e) => { e.stopPropagation(); openImgActionMenu(node, renderLevel2); }, 
+                    (e) => { e.stopPropagation(); openModal(node.fullImgData); }            
+                );
+
+                fileInput.onchange = function(e) {
+                    let file = e.target.files[0];
+                    if (file) {
+                        compressImageTo600KB(file, function(optimizedBase64) {
+                            node.fullImgData = optimizedBase64; if(!node.imageId) node.imageId = generateId();
+                            generateThumbnail(optimizedBase64, function(thumb) { node.thumbData = thumb; saveToLocal(); renderLevel2(); });
+                        });
+                    }
+                };
+                imgContainer.append(uploadBtn, fileInput, imgPreview);
+
+                let btn = document.createElement('button'); btn.className = 'main-btn'; btn.textContent = node.name; btn.style.backgroundColor = node.color;
+                addLongPress(btn, () => openActionMenu(2, id, node), () => openWindow3(id));
+                row.append(imgContainer, btn); container.appendChild(row);
+            }
+        }
+
+        function openWindow3(id) { currentL2Id = id; document.getElementById('window3-title').textContent = appData[currentL1Id].subButtons[id].name; goForward(3); renderLevel3(); }
+        function addLevel3Button() { let name = prompt("ਬਟਨ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ:"); if (!name || name.trim() === "") return; appData[currentL1Id].subButtons[currentL2Id].subSubButtons[generateId()] = { name: name.trim(), color: getRandomColor(), profiles: [] }; saveToLocal(); renderLevel3(); }
+        function renderLevel3() {
+            const container = document.getElementById('level3-container'); container.innerHTML = '';
+            let subSubs = appData[currentL1Id].subButtons[currentL2Id].subSubButtons;
+            for (let id in subSubs) {
+                let node = subSubs[id]; if(!node.color) node.color = getRandomColor();
+                let row = document.createElement('div'); row.className = 'button-row'; row.setAttribute('data-id', id); attachDragEvents(row, 'level3-container');
+                let btn = document.createElement('button'); btn.className = 'main-btn'; btn.textContent = node.name; btn.style.backgroundColor = node.color;
+                addLongPress(btn, () => openActionMenu(3, id, node), () => openWindow4(id));
+                row.append(btn); container.appendChild(row);
+            }
+        }
+
+        function openWindow4(id) { currentL3Id = id; document.getElementById('window4-title').textContent = appData[currentL1Id].subButtons[currentL2Id].subSubButtons[id].name; goForward(4); renderLevel4(); }
+        function addImageProfile() { appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentL3Id].profiles.push({ imageId: generateId(), fullImgData: null, thumbData: null, bio: { name: "", relation: "", fatherName: "", motherName: "", age: "", mobileNo: "" } }); saveToLocal(); renderLevel4(); }
+        
+        function renderLevel4() {
+            const container = document.getElementById('level4-container'); container.innerHTML = '';
+            let profiles = appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentL3Id].profiles;
+            
+            profiles.forEach((profile, index) => {
+                let card = document.createElement('div'); card.className = 'profile-card';
+                let headerDiv = document.createElement('div'); headerDiv.className = 'profile-header';
+                let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
+                let imgPreview = document.createElement('img'); imgPreview.className = 'tiny-img';
+                
+                if (profile.thumbData) { 
+                    imgPreview.src = profile.thumbData; 
+                    imgPreview.style.display = 'block'; 
+                    fileInput.style.display = 'none'; 
+                }
+                
+                fileInput.onchange = function(e) {
+                    let file = e.target.files[0];
+                    if (file) {
+                        compressImageTo600KB(file, function(optimizedBase64) {
+                            profile.fullImgData = optimizedBase64; 
+                            generateThumbnail(optimizedBase64, function(thumb) { profile.thumbData = thumb; saveToLocal(); renderLevel4(); });
+                        });
+                    }
+                };
+
+                addLongPress(imgPreview, 
+                    (e) => { e.stopPropagation(); openImgActionMenu(profile, renderLevel4); }, 
+                    (e) => { e.stopPropagation(); openModal(profile.fullImgData); }
+                );
+
+                let nameDiv = document.createElement('div'); nameDiv.className = 'small-box'; let nameLabel = document.createElement('label'); nameLabel.textContent = 'ਨਾਮ'; let nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.value = profile.bio.name || ""; nameInput.oninput = (e) => { profile.bio.name = e.target.value; saveToLocal(); }; nameDiv.append(nameLabel, nameInput);
+                let relationDiv = document.createElement('div'); relationDiv.className = 'small-box'; let relationLabel = document.createElement('label'); relationLabel.textContent = 'ਰਿਸ਼ਤਾ'; let relationInput = document.createElement('input'); relationInput.type = 'text'; relationInput.value = profile.bio.relation || ""; relationInput.oninput = (e) => { profile.bio.relation = e.target.value; saveToLocal(); }; relationDiv.append(relationLabel, relationInput);
+
+                headerDiv.append(fileInput, imgPreview, nameDiv, relationDiv); card.appendChild(headerDiv);
+
+                let bioDiv = document.createElement('div'); bioDiv.className = 'bio-inputs';
+                function createInputGroup(labelText, key) { let group = document.createElement('div'); group.className = 'input-group'; let label = document.createElement('label'); label.textContent = labelText; let input = document.createElement('input'); input.type = 'text'; input.value = profile.bio[key] || ""; input.oninput = (e) => { profile.bio[key] = e.target.value; saveToLocal(); }; group.append(label, input); return group; }
+                bioDiv.append(createInputGroup('ਪਿਤਾ ਦਾ ਨਾਮ', 'fatherName'), createInputGroup('ਮਾਤਾ ਦਾ ਨਾਮ', 'motherName'), createInputGroup('ਉਮਰ', 'age'), createInputGroup('ਮੋਬਾਈਲ ਨੰ.', 'mobileNo')); card.appendChild(bioDiv);
+
+                let cardActions = document.createElement('div'); cardActions.className = 'card-actions';
+                let copyBtn = document.createElement('button'); copyBtn.className = 'card-btn btn-copy'; copyBtn.innerHTML = '📄 ਕਾਪੀ'; copyBtn.onclick = () => { let c = JSON.parse(JSON.stringify(profile)); c.imageId = generateId(); profiles.splice(index + 1, 0, c); saveToLocal(); renderLevel4(); };
+                let delBtn = document.createElement('button'); delBtn.className = 'card-btn btn-del'; delBtn.innerHTML = '❌ ਡਿਲੀਟ'; delBtn.onclick = () => { if(confirm("ਡਿਲੀਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?")) { profiles.splice(index, 1); saveToLocal(); renderLevel4(); } };
+                cardActions.append(copyBtn, delBtn); card.appendChild(cardActions); container.appendChild(card);
+            });
+        }
+
+        function goForward(target) { document.querySelectorAll('.window-view').forEach(w => w.classList.remove('active-window')); document.getElementById('window' + target).classList.add('active-window'); }
+        function goBack(targetWindow) { document.querySelectorAll('.window-view').forEach(w => w.classList.remove('active-window')); document.getElementById('window' + targetWindow).classList.add('active-window'); if (targetWindow === 1) currentL1Id = null; else if (targetWindow === 2) currentL2Id = null; else if (targetWindow === 3) currentL3Id = null; }
+
+        let modal = document.getElementById("imageModal"); let modalImg = document.getElementById("fullImg");
+        function openModal(imgSrc) { if(imgSrc) { modal.style.display = "flex"; modalImg.src = imgSrc; } }
+        function closeModal(event) { if (event.target.classList.contains('modal') || event.target.classList.contains('close')) { modal.style.display = "none"; } }
+
+        function resetApp() {
+            let savedPass = localStorage.getItem('appPassword');
+            if (savedPass) { if (prompt("ਪਾਸਵਰਡ ਦਰਜ ਕਰੋ:") !== savedPass) { alert("ਗਲਤ ਪਾਸਵਰਡ!"); return; } } 
+            else { let setPass = prompt("ਸੁਰੱਖਿਆ ਲਈ ਨਵਾਂ ਪਾਸਵਰਡ ਬਣਾਓ:"); if(!setPass) return; if(setPass !== prompt("ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਭਰੋ:")) { alert("ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ!"); return; } localStorage.setItem('appPassword', setPass); }
+            if (confirm("ਕੀ ਤੁਸੀਂ ਸੱਚਮੁੱਚ ਸਾਰਾ ਡਾਟਾ ਡਿਲੀਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?")) { appData = {}; saveToLocal(); localStorage.removeItem('appPassword'); renderLevel1(); alert("ਡਿਲੀਟ ਹੋ ਗਿਆ।"); }
+        }
+
+        // --- ZIP Export & Import ---
+        async function exportToZip() {
+            if(Object.keys(appData).length === 0) { alert("ਪਹਿਲਾਂ ਕੁਝ ਡਾਟਾ ਭਰੋ!"); return; }
+            let zip = new JSZip(); let excelFolder = zip.folder("1_Excel"); let thumbFolder = zip.folder("2_Thumbnails"); let imgFolder = zip.folder("3_Images");
+            let csvContent = "\uFEFFLevel 1,Level 2,Level 3,Name,Relation,Father Name,Mother Name,Age,Mobile No,Image File\n";
+            let stateData = JSON.parse(JSON.stringify(appData));
+
+            for (let l1 in appData) {
+                let name1 = appData[l1].name; let l2Keys = Object.keys(appData[l1].subButtons);
+                if (l2Keys.length === 0) csvContent += `"${name1}","","","","","","","","",""\n`;
+                else {
+                    for (let l2 of l2Keys) {
+                        let l2Node = appData[l1].subButtons[l2]; let name2 = l2Node.name;
+                        if(l2Node.fullImgData) { let imgName = l2Node.imageId + "_L2.jpg"; imgFolder.file(imgName, l2Node.fullImgData.split(',')[1], {base64: true}); thumbFolder.file(imgName, l2Node.thumbData.split(',')[1], {base64: true}); stateData[l1].subButtons[l2].fullImgData = null; stateData[l1].subButtons[l2].thumbData = null; }
+                        let l3Keys = Object.keys(l2Node.subSubButtons);
+                        if (l3Keys.length === 0) csvContent += `"${name1}","${name2}","","","","","","","",""\n`;
+                        else {
+                            for (let l3 of l3Keys) {
+                                let l3Node = l2Node.subSubButtons[l3]; let name3 = l3Node.name;
+                                let profiles = l3Node.profiles; let stateProfiles = stateData[l1].subButtons[l2].subSubButtons[l3].profiles;
+                                if (profiles.length === 0) csvContent += `"${name1}","${name2}","${name3}","","","","","","",""\n`;
+                                else {
+                                    profiles.forEach((p, index) => {
+                                        let imgName = p.imageId + ".jpg";
+                                        csvContent += `"${name1}","${name2}","${name3}","${p.bio.name || ''}","${p.bio.relation || ''}","${p.bio.fatherName || ''}","${p.bio.motherName || ''}","${p.bio.age || ''}","${p.bio.mobileNo || ''}","${p.fullImgData ? imgName : 'No Image'}"\n`;
+                                        if (p.fullImgData) imgFolder.file(imgName, p.fullImgData.split(',')[1], {base64: true});
+                                        if (p.thumbData) thumbFolder.file(imgName, p.thumbData.split(',')[1], {base64: true});
+                                        stateProfiles[index].fullImgData = null; stateProfiles[index].thumbData = null;
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            excelFolder.file("Data.csv", csvContent); zip.file("app_state.json", JSON.stringify(stateData));
+            zip.generateAsync({type:"blob"}).then(function(content) { saveAs(content, "Bio_Data_Backup.zip"); });
+        }
+
+        function importFromZip(event) {
+            let file = event.target.files[0]; if (!file) return;
+            let pass1 = prompt("ਡਾਟਾ ਸੁਰੱਖਿਅਤ ਰੱਖਣ ਲਈ ਨਵਾਂ ਪਾਸਵਰਡ ਬਣਾਓ:"); if(!pass1) { document.getElementById('zip-upload').value = ""; return; }
+            let pass2 = prompt("ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਭਰੋ:"); if(pass1 !== pass2) { alert("ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ!"); document.getElementById('zip-upload').value = ""; return; }
+            localStorage.setItem('appPassword', pass1);
+
+            JSZip.loadAsync(file).then(async function(zip) {
+                let stateFile = zip.file("app_state.json"); if(!stateFile) { alert("ਗਲਤ ZIP ਫਾਈਲ!"); return; }
+                appData = JSON.parse(await stateFile.async("string"));
+
+                for (let l1 in appData) {
+                    for (let l2 in appData[l1].subButtons) {
+                        let l2Node = appData[l1].subButtons[l2];
+                        if(l2Node.imageId) { let f = zip.file("3_Images/" + l2Node.imageId + "_L2.jpg"); if(f) l2Node.fullImgData = "data:image/jpeg;base64," + await f.async("base64"); let t = zip.file("2_Thumbnails/" + l2Node.imageId + "_L2.jpg"); if(t) l2Node.thumbData = "data:image/jpeg;base64," + await t.async("base64"); }
+                        for (let l3 in l2Node.subSubButtons) {
+                            let l3Node = l2Node.subSubButtons[l3];
+                            for (let p of l3Node.profiles) { let f = zip.file("3_Images/" + p.imageId + ".jpg"); if(f) p.fullImgData = "data:image/jpeg;base64," + await f.async("base64"); let t = zip.file("2_Thumbnails/" + p.imageId + ".jpg"); if(t) p.thumbData = "data:image/jpeg;base64," + await t.async("base64"); }
+                        }
+                    }
+                }
+                saveToLocal(); alert("ਡਾਟਾ ਸਫ਼ਲਤਾਪੂਰਵਕ ਅੱਪਲੋਡ ਹੋ ਗਿਆ!"); renderLevel1(); document.getElementById('zip-upload').value = ""; 
+            }).catch(err => { alert("ZIP ਪੜ੍ਹਨ ਵਿੱਚ ਗਲਤੀ: " + err); });
+        }
+    </script>
+</body>
+</html>
