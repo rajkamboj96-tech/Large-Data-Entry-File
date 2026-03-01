@@ -3,9 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App with 600KB Auto-Compress & Long Press</title>
+    <title>Mobile Friendly Bio Data App</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
         body { font-family: Arial, sans-serif; background-color: #f0f2f5; padding: 15px; margin: 0; font-size: 14px; user-select: none; }
         .window-view { display: none; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 950px; margin: 0 auto; }
@@ -23,8 +27,8 @@
 
         @media (min-width: 768px) { .button-row { width: calc(50% - 5px); } }
 
-        .main-btn { flex-grow: 1; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 15px; text-align: left; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
-        .main-btn:hover { filter: brightness(0.9); }
+        .main-btn { flex-grow: 1; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; font-size: 15px; text-align: left; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .main-btn:hover { filter: brightness(1.2); }
         
         .tiny-btn { background-color: #28a745; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: center; padding: 0; }
         
@@ -33,24 +37,42 @@
         .action-btn { color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
         .download-btn { background-color: #ff9800; } 
         .upload-btn { background-color: #17a2b8; } 
+        .excel-btn { background-color: #28a745; }
         .reset-btn { background-color: #dc3545; } 
 
         #level4-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
         @media (max-width: 850px) { #level4-container { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px) { #level4-container { grid-template-columns: 1fr; } }
+        
+        /* Mobile Specific Styles */
+        @media (max-width: 600px) { 
+            #level4-container { grid-template-columns: 1fr; } 
+            .tiny-img { width: 55px !important; height: 55px !important; } /* 25% Larger on Mobile */
+            .profile-header { flex-direction: column; align-items: flex-start !important; }
+        }
 
         .profile-card { border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
-        .profile-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .profile-header input[type="file"] { font-size: 11px; width: 140px; }
+        .profile-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 5px; }
 
-        .tiny-upload-btn { background: #f8f9fa; border: 1px solid #ccc; font-size: 16px; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+        .tiny-upload-btn { background: #f8f9fa; border: 1px solid #ccc; font-size: 16px; cursor: pointer; padding: 8px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
         .tiny-upload-btn:hover { background: #e2e6ea; }
-        .tiny-img { width: 42px; height: 42px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; display: none; }
+        
+        .img-wrapper { display: flex; align-items: center; gap: 5px; }
+        .tiny-img { width: 42px; height: 42px; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; }
         .tiny-img:hover { transform: scale(1.05); }
+        
+        /* Edit & Delete Icons next to image */
+        .img-icon-actions { display: flex; flex-direction: column; gap: 3px; }
+        .icon-btn { background: #fff; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; padding: 2px 4px; cursor: pointer; transition: 0.2s; }
+        .icon-btn:hover { background: #eee; }
 
-        .small-box { display: flex; flex-direction: column; flex-grow: 1; min-width: 90px; }
+        .small-box { display: flex; flex-direction: column; }
         .small-box label, .input-group label { font-size: 11px; font-weight: bold; color: #444; margin-bottom: 2px; }
-        .small-box input[type="text"], .input-group input[type="text"] { width: 100%; padding: 4px 6px; box-sizing: border-box; border-radius: 3px; border: 1px solid #ccc; font-size: 12px; height: 26px; }
+        .small-box input[type="text"], .input-group input[type="text"], .bio-textarea { width: 100%; padding: 4px 6px; box-sizing: border-box; border-radius: 3px; border: 1px solid #ccc; font-size: 12px; }
+        .small-box input[type="text"], .input-group input[type="text"] { height: 26px; }
+        
+        .name-relation-row { display: flex; width: 100%; gap: 8px; }
+
+        .bio-textarea { resize: vertical; min-height: 50px; font-family: Arial, sans-serif; }
 
         .bio-inputs { display: flex; flex-wrap: wrap; gap: 8px; }
         .input-group { display: flex; flex-direction: column; width: 48%; flex: 1 1 45%; }
@@ -70,13 +92,15 @@
 </head>
 <body>
 
-    <input type="file" id="globalReplaceImgInput" accept="image/*" style="display:none;">
-
     <div id="window1" class="window-view active-window">
         <div class="header">
-            <h2>ਮੁੱਖ ਬਟਨ (Level 1) <br><small style="font-size:12px; color:#666;">(ਐਡਿਟ ਕਰਨ ਲਈ ਬਟਨ ਦਬਾ ਕੇ ਰੱਖੋ)</small></h2>
+            <h2>ਮੁੱਖ ਬਟਨ (Level 1) <br><small style="font-size:12px; color:#666;">(ਬਟਨ ਐਡਿਟ ਕਰਨ ਲਈ ਦਬਾ ਕੇ ਰੱਖੋ)</small></h2>
             <div class="header-actions">
                 <button class="action-btn reset-btn" onclick="resetApp()">Reset</button>
+                
+                <input type="file" id="excel-upload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" style="display:none;" onchange="importFromExcel(event)">
+                <button class="action-btn excel-btn" onclick="document.getElementById('excel-upload').click()">Excel ਅੱਪਲੋਡ</button>
+                
                 <input type="file" id="zip-upload" accept=".zip" style="display:none;" onchange="importFromZip(event)">
                 <button class="action-btn upload-btn" onclick="document.getElementById('zip-upload').click()">ZIP ਅੱਪਲੋਡ</button>
                 <button class="action-btn download-btn" onclick="exportToZip()">ZIP ਡਾਊਨਲੋਡ</button>
@@ -127,20 +151,16 @@
         </div>
     </div>
 
-    <div id="imgActionMenuModal" class="modal" onclick="closeImgActionMenu(event)">
-        <div class="action-modal-box" onclick="event.stopPropagation()">
-            <h3 style="margin-top:0;">ਫੋਟੋ ਆਪਸ਼ਨ</h3>
-            <button class="action-modal-btn" style="background:#007bff;" id="actImgReplace">🖼️ ਫੋਟੋ ਬਦਲੋ (Replace)</button>
-            <button class="action-modal-btn" style="background:#dc3545; margin-bottom:0;" id="actImgDel">🗑️ ਫੋਟੋ ਹਟਾਓ (Delete)</button>
-        </div>
-    </div>
-
     <script>
         let appData = {};
         let currentL1Id = null, currentL2Id = null, currentL3Id = null;
         let db;
 
-        const buttonColors = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#469990', '#9A6324', '#800000', '#000075', '#008080', '#e6beff', '#aaffc3', '#808000', '#ffd8b1'];
+        const buttonColors = [
+            '#800000', '#000075', '#008080', '#4A148C', '#004D40', 
+            '#01579B', '#1B5E20', '#3E2723', '#263238', '#B71C1C', 
+            '#880E4F', '#311B92', '#0D47A1', '#827717', '#E65100', '#4E342E'
+        ];
         function getRandomColor() { return buttonColors[Math.floor(Math.random() * buttonColors.length)]; }
         function generateId() { return '_' + Math.random().toString(36).substr(2, 9); }
 
@@ -163,12 +183,9 @@
             return cloned;
         }
 
-        // --- New: Compress Image to < 600KB ---
         function compressImageTo600KB(file, callback) {
-            const TARGET_SIZE = 614400; // 600KB in bytes
-            if (file.size <= TARGET_SIZE) {
-                let reader = new FileReader(); reader.onload = (e) => callback(e.target.result); reader.readAsDataURL(file); return;
-            }
+            const TARGET_SIZE = 614400; // 600KB
+            if (file.size <= TARGET_SIZE) { let reader = new FileReader(); reader.onload = (e) => callback(e.target.result); reader.readAsDataURL(file); return; }
             let reader = new FileReader();
             reader.onload = function(event) {
                 let img = new Image();
@@ -178,11 +195,7 @@
                     canvas.width = img.width * scaleRatio; canvas.height = img.height * scaleRatio;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     let quality = 0.9; let dataUrl = canvas.toDataURL("image/jpeg", quality);
-                    
-                    // 600KB in base64 is approx 820,000 characters
-                    while (dataUrl.length > 820000 && quality > 0.1) { 
-                        quality -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", quality); 
-                    }
+                    while (dataUrl.length > 820000 && quality > 0.1) { quality -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", quality); }
                     callback(dataUrl);
                 }; img.src = event.target.result;
             }; reader.readAsDataURL(file);
@@ -201,36 +214,24 @@
             }; img.src = base64Image;
         }
 
-        // --- Long Press Logic ---
+        // --- Long Press Logic (Buttons Only) ---
         function addLongPress(element, onLongPress, onClick) {
             let timer; let isDragging = false;
-            function startPress(e) {
-                if (e.type === 'mousedown' && e.button !== 0) return;
-                isDragging = false;
-                timer = setTimeout(() => { isDragging = true; onLongPress(e); }, 500);
-            }
+            function startPress(e) { if (e.type === 'mousedown' && e.button !== 0) return; isDragging = false; timer = setTimeout(() => { isDragging = true; onLongPress(e); }, 500); }
             function cancelPress() { clearTimeout(timer); isDragging = true; }
-            function endPress(e) { clearTimeout(timer); if (!isDragging && onClick) onClick(e); isDragging = false; }
-
-            element.addEventListener('mousedown', startPress); element.addEventListener('touchstart', startPress, {passive: true});
-            element.addEventListener('mouseup', endPress); element.addEventListener('touchend', endPress);
-            element.addEventListener('mousemove', cancelPress); element.addEventListener('touchmove', cancelPress, {passive: true});
-            element.addEventListener('mouseleave', cancelPress);
+            function endPress(e) { 
+                clearTimeout(timer); 
+                if (!isDragging && onClick) { if(e.cancelable) e.preventDefault(); onClick(e); } 
+                isDragging = false; 
+            }
+            element.addEventListener('mousedown', startPress); element.addEventListener('touchstart', startPress, {passive: true}); element.addEventListener('mouseup', endPress); element.addEventListener('touchend', endPress); element.addEventListener('mousemove', cancelPress); element.addEventListener('touchmove', cancelPress, {passive: true}); element.addEventListener('mouseleave', cancelPress);
         }
 
-        // --- Drag & Drop ---
         let draggedRow = null;
         function attachDragEvents(row, containerId) {
             row.setAttribute('draggable', true);
             row.addEventListener('dragstart', function(e) { draggedRow = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-            row.addEventListener('dragover', function(e) {
-                e.preventDefault(); const target = e.target.closest('.button-row');
-                if (target && target !== draggedRow) {
-                    const rect = target.getBoundingClientRect();
-                    const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > .5 || (e.clientX - rect.left) / (rect.right - rect.left) > .5;
-                    target.parentNode.insertBefore(draggedRow, next && target.nextSibling || target);
-                }
-            });
+            row.addEventListener('dragover', function(e) { e.preventDefault(); const target = e.target.closest('.button-row'); if (target && target !== draggedRow) { const rect = target.getBoundingClientRect(); const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > .5 || (e.clientX - rect.left) / (rect.right - rect.left) > .5; target.parentNode.insertBefore(draggedRow, next && target.nextSibling || target); } });
             row.addEventListener('dragend', function() { this.classList.remove('dragging'); draggedRow = null; saveNewOrder(containerId); });
         }
 
@@ -243,62 +244,63 @@
             saveToLocal();
         }
 
-        // --- Button Action Menu ---
         let currentContext = null;
-        function openActionMenu(level, id, node) {
-            currentContext = { level, id, node }; document.getElementById('actionMenuTitle').textContent = node.name; document.getElementById('actionMenuModal').style.display = 'flex';
-        }
+        function openActionMenu(level, id, node) { currentContext = { level, id, node }; document.getElementById('actionMenuTitle').textContent = node.name; document.getElementById('actionMenuModal').style.display = 'flex'; }
         function closeActionMenu(e) { if (e && e.target.id !== 'actionMenuModal') return; document.getElementById('actionMenuModal').style.display = 'none'; }
-
         document.getElementById('actEdit').onclick = () => { closeActionMenu(); let n = prompt("ਨਵਾਂ ਨਾਮ ਲਿਖੋ:", currentContext.node.name); if(n) { currentContext.node.name = n; saveToLocal(); refreshCurrentLevel(); } };
         document.getElementById('actCopy').onclick = () => { closeActionMenu(); let c = cloneNode(currentContext.node, currentContext.level); if(currentContext.level === 1) appData[generateId()] = c; else if(currentContext.level === 2) appData[currentL1Id].subButtons[generateId()] = c; else if(currentContext.level === 3) appData[currentL1Id].subButtons[currentL2Id].subSubButtons[generateId()] = c; saveToLocal(); refreshCurrentLevel(); };
         document.getElementById('actDel').onclick = () => { closeActionMenu(); if(confirm("ਕੀ ਤੁਸੀਂ ਇਸਨੂੰ ਡਿਲੀਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?")) { if(currentContext.level === 1) delete appData[currentContext.id]; else if(currentContext.level === 2) delete appData[currentL1Id].subButtons[currentContext.id]; else if(currentContext.level === 3) delete appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentContext.id]; saveToLocal(); refreshCurrentLevel(); } };
-
         function refreshCurrentLevel() { if(currentContext.level === 1) renderLevel1(); else if(currentContext.level === 2) renderLevel2(); else if(currentContext.level === 3) renderLevel3(); }
 
-        // --- Image Action Menu (Replace / Delete) ---
-        let currentImageContext = null;
-        function openImgActionMenu(node, callback) {
-            currentImageContext = { node, renderCallback: callback };
-            document.getElementById('imgActionMenuModal').style.display = 'flex';
-        }
-        function closeImgActionMenu(e) {
-            if (e && e.target.id !== 'imgActionMenuModal') return;
-            document.getElementById('imgActionMenuModal').style.display = 'none';
-        }
+        // --- Image UI Creator (With explicit Edit/Del Icons) ---
+        function createExplicitImageControls(node, callback) {
+            let container = document.createElement('div'); container.className = 'img-wrapper';
+            
+            let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+            let uploadBtn = document.createElement('button'); uploadBtn.className = 'tiny-upload-btn'; uploadBtn.innerHTML = '📷';
+            
+            let imgPreview = document.createElement('img'); imgPreview.className = 'tiny-img';
+            imgPreview.style.display = 'none';
 
-        document.getElementById('actImgReplace').onclick = () => {
-            closeImgActionMenu();
-            document.getElementById('globalReplaceImgInput').click(); 
-        };
+            let actionIcons = document.createElement('div'); actionIcons.className = 'img-icon-actions';
+            actionIcons.style.display = 'none';
 
-        document.getElementById('actImgDel').onclick = () => {
-            closeImgActionMenu();
-            if(confirm("ਕੀ ਤੁਸੀਂ ਇਹ ਫੋਟੋ ਹਟਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?")) {
-                currentImageContext.node.fullImgData = null;
-                currentImageContext.node.thumbData = null;
-                saveToLocal();
-                currentImageContext.renderCallback(); 
+            let editBtn = document.createElement('button'); editBtn.className = 'icon-btn'; editBtn.innerHTML = '✏️'; editBtn.title = "ਫੋਟੋ ਬਦਲੋ";
+            let delBtn = document.createElement('button'); delBtn.className = 'icon-btn'; delBtn.innerHTML = '❌'; delBtn.title = "ਫੋਟੋ ਹਟਾਓ";
+            actionIcons.append(editBtn, delBtn);
+
+            if (node.thumbData) { 
+                imgPreview.src = node.thumbData; imgPreview.style.display = 'block'; 
+                uploadBtn.style.display = 'none'; actionIcons.style.display = 'flex';
             }
-        };
+            
+            uploadBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
+            editBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
+            
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                if(confirm("ਕੀ ਤੁਸੀਂ ਇਹ ਫੋਟੋ ਹਟਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?")) {
+                    node.fullImgData = null; node.thumbData = null;
+                    saveToLocal(); callback();
+                }
+            };
 
-        document.getElementById('globalReplaceImgInput').onchange = function(e) {
-            let file = e.target.files[0];
-            if (file && currentImageContext) {
-                compressImageTo600KB(file, function(optimizedBase64) {
-                    currentImageContext.node.fullImgData = optimizedBase64;
-                    if(!currentImageContext.node.imageId) currentImageContext.node.imageId = generateId();
-                    generateThumbnail(optimizedBase64, function(thumb) {
-                        currentImageContext.node.thumbData = thumb; 
-                        saveToLocal(); 
-                        currentImageContext.renderCallback();
-                    });
-                });
-            }
-            this.value = ''; 
-        };
+            imgPreview.onclick = (e) => { e.stopPropagation(); openModal(node.fullImgData); };
 
-        // --- Render Levels ---
+            fileInput.onchange = function(e) { 
+                let file = e.target.files[0]; 
+                if (file) { 
+                    compressImageTo600KB(file, function(optimizedBase64) { 
+                        node.fullImgData = optimizedBase64; if(!node.imageId) node.imageId = generateId(); 
+                        generateThumbnail(optimizedBase64, function(thumb) { node.thumbData = thumb; saveToLocal(); callback(); }); 
+                    }); 
+                } 
+            };
+            
+            container.append(uploadBtn, fileInput, imgPreview, actionIcons);
+            return container;
+        }
+
         function addLevel1Button() { let name = prompt("ਨਵੇਂ ਬਟਨ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ:"); if (!name || name.trim() === "") return; appData[generateId()] = { name: name.trim(), color: getRandomColor(), subButtons: {} }; saveToLocal(); renderLevel1(); }
         function renderLevel1() {
             const container = document.getElementById('level1-container'); container.innerHTML = '';
@@ -320,34 +322,11 @@
                 let node = subs[id]; if(!node.color) node.color = getRandomColor();
                 let row = document.createElement('div'); row.className = 'button-row'; row.setAttribute('data-id', id); attachDragEvents(row, 'level2-container');
 
-                let imgContainer = document.createElement('div'); imgContainer.style.display = 'flex'; imgContainer.style.alignItems = 'center'; imgContainer.style.gap = '5px';
-                let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
-                let uploadBtn = document.createElement('button'); uploadBtn.className = 'tiny-upload-btn'; uploadBtn.innerHTML = '📷'; uploadBtn.title = "ਫੋਟੋ ਜੋੜੋ";
-                let imgPreview = document.createElement('img'); imgPreview.className = 'tiny-img';
-                
-                if (node.thumbData) { imgPreview.src = node.thumbData; imgPreview.style.display = 'block'; uploadBtn.style.display = 'none'; }
-                
-                uploadBtn.onclick = (e) => { e.stopPropagation(); fileInput.click(); };
-                
-                addLongPress(imgPreview, 
-                    (e) => { e.stopPropagation(); openImgActionMenu(node, renderLevel2); }, 
-                    (e) => { e.stopPropagation(); openModal(node.fullImgData); }            
-                );
-
-                fileInput.onchange = function(e) {
-                    let file = e.target.files[0];
-                    if (file) {
-                        compressImageTo600KB(file, function(optimizedBase64) {
-                            node.fullImgData = optimizedBase64; if(!node.imageId) node.imageId = generateId();
-                            generateThumbnail(optimizedBase64, function(thumb) { node.thumbData = thumb; saveToLocal(); renderLevel2(); });
-                        });
-                    }
-                };
-                imgContainer.append(uploadBtn, fileInput, imgPreview);
+                let imgControls = createExplicitImageControls(node, renderLevel2);
 
                 let btn = document.createElement('button'); btn.className = 'main-btn'; btn.textContent = node.name; btn.style.backgroundColor = node.color;
                 addLongPress(btn, () => openActionMenu(2, id, node), () => openWindow3(id));
-                row.append(imgContainer, btn); container.appendChild(row);
+                row.append(imgControls, btn); container.appendChild(row);
             }
         }
 
@@ -366,7 +345,7 @@
         }
 
         function openWindow4(id) { currentL3Id = id; document.getElementById('window4-title').textContent = appData[currentL1Id].subButtons[currentL2Id].subSubButtons[id].name; goForward(4); renderLevel4(); }
-        function addImageProfile() { appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentL3Id].profiles.push({ imageId: generateId(), fullImgData: null, thumbData: null, bio: { name: "", relation: "", fatherName: "", motherName: "", age: "", mobileNo: "" } }); saveToLocal(); renderLevel4(); }
+        function addImageProfile() { appData[currentL1Id].subButtons[currentL2Id].subSubButtons[currentL3Id].profiles.push({ imageId: generateId(), fullImgData: null, thumbData: null, bio: { name: "", relation: "", fatherName: "", motherName: "", age: "", mobileNo: "", biography: "" } }); saveToLocal(); renderLevel4(); }
         
         function renderLevel4() {
             const container = document.getElementById('level4-container'); container.innerHTML = '';
@@ -374,39 +353,46 @@
             
             profiles.forEach((profile, index) => {
                 let card = document.createElement('div'); card.className = 'profile-card';
+                
+                // Header (Image Controls)
                 let headerDiv = document.createElement('div'); headerDiv.className = 'profile-header';
-                let fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = 'image/*';
-                let imgPreview = document.createElement('img'); imgPreview.className = 'tiny-img';
+                let imgControls = createExplicitImageControls(profile, renderLevel4);
+                headerDiv.appendChild(imgControls);
                 
-                if (profile.thumbData) { 
-                    imgPreview.src = profile.thumbData; 
-                    imgPreview.style.display = 'block'; 
-                    fileInput.style.display = 'none'; 
-                }
-                
-                fileInput.onchange = function(e) {
-                    let file = e.target.files[0];
-                    if (file) {
-                        compressImageTo600KB(file, function(optimizedBase64) {
-                            profile.fullImgData = optimizedBase64; 
-                            generateThumbnail(optimizedBase64, function(thumb) { profile.thumbData = thumb; saveToLocal(); renderLevel4(); });
-                        });
-                    }
-                };
+                // Name (70%) & Relation (30%) in one row next to image on PC, below on Mobile
+                let nameRelRow = document.createElement('div'); 
+                nameRelRow.className = 'name-relation-row';
 
-                addLongPress(imgPreview, 
-                    (e) => { e.stopPropagation(); openImgActionMenu(profile, renderLevel4); }, 
-                    (e) => { e.stopPropagation(); openModal(profile.fullImgData); }
-                );
+                let nameDiv = document.createElement('div'); nameDiv.className = 'small-box'; nameDiv.style.flex = '7';
+                let nameLabel = document.createElement('label'); nameLabel.textContent = 'ਨਾਮ (Name)'; 
+                let nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.value = profile.bio.name || ""; 
+                nameInput.oninput = (e) => { profile.bio.name = e.target.value; saveToLocal(); }; 
+                nameDiv.append(nameLabel, nameInput);
 
-                let nameDiv = document.createElement('div'); nameDiv.className = 'small-box'; let nameLabel = document.createElement('label'); nameLabel.textContent = 'ਨਾਮ'; let nameInput = document.createElement('input'); nameInput.type = 'text'; nameInput.value = profile.bio.name || ""; nameInput.oninput = (e) => { profile.bio.name = e.target.value; saveToLocal(); }; nameDiv.append(nameLabel, nameInput);
-                let relationDiv = document.createElement('div'); relationDiv.className = 'small-box'; let relationLabel = document.createElement('label'); relationLabel.textContent = 'ਰਿਸ਼ਤਾ'; let relationInput = document.createElement('input'); relationInput.type = 'text'; relationInput.value = profile.bio.relation || ""; relationInput.oninput = (e) => { profile.bio.relation = e.target.value; saveToLocal(); }; relationDiv.append(relationLabel, relationInput);
+                let relationDiv = document.createElement('div'); relationDiv.className = 'small-box'; relationDiv.style.flex = '3';
+                let relationLabel = document.createElement('label'); relationLabel.textContent = 'ਰਿਸ਼ਤਾ'; 
+                let relationInput = document.createElement('input'); relationInput.type = 'text'; relationInput.value = profile.bio.relation || ""; 
+                relationInput.oninput = (e) => { profile.bio.relation = e.target.value; saveToLocal(); }; 
+                relationDiv.append(relationLabel, relationInput);
 
-                headerDiv.append(fileInput, imgPreview, nameDiv, relationDiv); card.appendChild(headerDiv);
+                nameRelRow.append(nameDiv, relationDiv);
+                headerDiv.appendChild(nameRelRow);
+                card.appendChild(headerDiv);
 
+                // Other Bio Inputs
                 let bioDiv = document.createElement('div'); bioDiv.className = 'bio-inputs';
                 function createInputGroup(labelText, key) { let group = document.createElement('div'); group.className = 'input-group'; let label = document.createElement('label'); label.textContent = labelText; let input = document.createElement('input'); input.type = 'text'; input.value = profile.bio[key] || ""; input.oninput = (e) => { profile.bio[key] = e.target.value; saveToLocal(); }; group.append(label, input); return group; }
-                bioDiv.append(createInputGroup('ਪਿਤਾ ਦਾ ਨਾਮ', 'fatherName'), createInputGroup('ਮਾਤਾ ਦਾ ਨਾਮ', 'motherName'), createInputGroup('ਉਮਰ', 'age'), createInputGroup('ਮੋਬਾਈਲ ਨੰ.', 'mobileNo')); card.appendChild(bioDiv);
+                
+                bioDiv.append(createInputGroup('ਪਿਤਾ ਦਾ ਨਾਮ', 'fatherName'), createInputGroup('ਮਾਤਾ ਦਾ ਨਾਮ', 'motherName'), createInputGroup('ਉਮਰ', 'age'), createInputGroup('ਮੋਬਾਈਲ ਨੰ.', 'mobileNo')); 
+                card.appendChild(bioDiv);
+
+                let bioTextAreaDiv = document.createElement('div'); bioTextAreaDiv.className = 'small-box'; bioTextAreaDiv.style.width = '100%';
+                let bioLabel = document.createElement('label'); bioLabel.textContent = 'Biography of this person';
+                let bioInput = document.createElement('textarea'); bioInput.className = 'bio-textarea';
+                bioInput.value = profile.bio.biography || "";
+                bioInput.oninput = (e) => { profile.bio.biography = e.target.value; saveToLocal(); };
+                bioTextAreaDiv.append(bioLabel, bioInput);
+                card.appendChild(bioTextAreaDiv);
 
                 let cardActions = document.createElement('div'); cardActions.className = 'card-actions';
                 let copyBtn = document.createElement('button'); copyBtn.className = 'card-btn btn-copy'; copyBtn.innerHTML = '📄 ਕਾਪੀ'; copyBtn.onclick = () => { let c = JSON.parse(JSON.stringify(profile)); c.imageId = generateId(); profiles.splice(index + 1, 0, c); saveToLocal(); renderLevel4(); };
@@ -429,31 +415,99 @@
             if (confirm("ਕੀ ਤੁਸੀਂ ਸੱਚਮੁੱਚ ਸਾਰਾ ਡਾਟਾ ਡਿਲੀਟ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?")) { appData = {}; saveToLocal(); localStorage.removeItem('appPassword'); renderLevel1(); alert("ਡਿਲੀਟ ਹੋ ਗਿਆ।"); }
         }
 
-        // --- ZIP Export & Import ---
+        function importFromExcel(event) {
+            let file = event.target.files[0]; if (!file) return;
+            
+            let pass1 = prompt("ਡਾਟਾ ਸੁਰੱਖਿਅਤ ਰੱਖਣ ਲਈ ਨਵਾਂ ਪਾਸਵਰਡ ਬਣਾਓ (ਜੇ ਪਹਿਲਾਂ ਬਣਿਆ ਹੈ ਤਾਂ ਉਹੀ ਭਰੋ):");
+            if(!pass1) { document.getElementById('excel-upload').value = ""; return; }
+            let savedPass = localStorage.getItem('appPassword');
+            if (savedPass) { if (pass1 !== savedPass) { alert("ਪਾਸਵਰਡ ਗਲਤ ਹੈ!"); document.getElementById('excel-upload').value = ""; return; } } 
+            else { let pass2 = prompt("ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਭਰੋ:"); if(pass1 !== pass2) { alert("ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ!"); document.getElementById('excel-upload').value = ""; return; } localStorage.setItem('appPassword', pass1); }
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let data = new Uint8Array(e.target.result);
+                let workbook;
+                try { workbook = XLSX.read(data, {type: 'array'}); } 
+                catch(err) { alert("ਫਾਈਲ ਪੜ੍ਹਨ ਵਿੱਚ ਗਲਤੀ ਹੋਈ! ਕਿਰਪਾ ਕਰਕੇ ਸਹੀ ਫਾਈਲ ਚੁਣੋ।"); return; }
+                
+                let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                let rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+
+                if(rows.length < 2) { alert("ਫਾਈਲ ਖਾਲੀ ਹੈ ਜਾਂ ਗਲਤ ਹੈ!"); return; }
+
+                let newAppData = {};
+                let l1Map = {}, l2Map = {}, l3Map = {};
+
+                for(let i = 1; i < rows.length; i++) {
+                    let cols = rows[i];
+                    if(!cols || cols.length === 0) continue;
+
+                    let l1 = cols[0] || "", l2 = cols[1] || "", l3 = cols[2] || "";
+                    let name = cols[3] || "", relation = cols[4] || "", fName = cols[5] || "", mName = cols[6] || "", age = cols[7] || "", mob = cols[8] || "", bioText = cols[9] || "";
+
+                    if(!l1) continue;
+                    if(!l1Map[l1]) { let id1 = generateId(); newAppData[id1] = { name: l1, color: getRandomColor(), subButtons: {} }; l1Map[l1] = id1; }
+                    let id1 = l1Map[l1];
+
+                    if(l2) {
+                        let l2Key = l1 + "||" + l2;
+                        if(!l2Map[l2Key]) { let id2 = generateId(); newAppData[id1].subButtons[id2] = { name: l2, color: getRandomColor(), subSubButtons: {} }; l2Map[l2Key] = id2; }
+                        let id2 = l2Map[l2Key];
+
+                        if(l3) {
+                            let l3Key = l2Key + "||" + l3;
+                            if(!l3Map[l3Key]) { let id3 = generateId(); newAppData[id1].subButtons[id2].subSubButtons[id3] = { name: l3, color: getRandomColor(), profiles: [] }; l3Map[l3Key] = id3; }
+                            let id3 = l3Map[l3Key];
+
+                            if(name || relation || fName || mName || age || mob || bioText) {
+                                newAppData[id1].subButtons[id2].subSubButtons[id3].profiles.push({
+                                    imageId: generateId(), fullImgData: null, thumbData: null,
+                                    bio: { name: name, relation: relation, fatherName: fName, motherName: mName, age: age, mobileNo: mob, biography: bioText }
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                appData = newAppData; saveToLocal();
+                alert("Excel ਡਾਟਾ ਸਫ਼ਲਤਾਪੂਰਵਕ ਨਵੀਂ ਫਾਈਲ ਵਾਂਗ ਅੱਪਲੋਡ ਹੋ ਗਿਆ ਹੈ!");
+                
+                document.querySelectorAll('.window-view').forEach(w => w.classList.remove('active-window')); document.getElementById('window1').classList.add('active-window');
+                currentL1Id = null; currentL2Id = null; currentL3Id = null;
+                renderLevel1(); document.getElementById('excel-upload').value = "";
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         async function exportToZip() {
             if(Object.keys(appData).length === 0) { alert("ਪਹਿਲਾਂ ਕੁਝ ਡਾਟਾ ਭਰੋ!"); return; }
             let zip = new JSZip(); let excelFolder = zip.folder("1_Excel"); let thumbFolder = zip.folder("2_Thumbnails"); let imgFolder = zip.folder("3_Images");
-            let csvContent = "\uFEFFLevel 1,Level 2,Level 3,Name,Relation,Father Name,Mother Name,Age,Mobile No,Image File\n";
+            
+            let csvContent = "\uFEFFLevel 1,Level 2,Level 3,Name,Relation,Father Name,Mother Name,Age,Mobile No,Biography,Image File\n";
             let stateData = JSON.parse(JSON.stringify(appData));
 
             for (let l1 in appData) {
                 let name1 = appData[l1].name; let l2Keys = Object.keys(appData[l1].subButtons);
-                if (l2Keys.length === 0) csvContent += `"${name1}","","","","","","","","",""\n`;
+                if (l2Keys.length === 0) csvContent += `"${name1}","","","","","","","","","",""\n`;
                 else {
                     for (let l2 of l2Keys) {
                         let l2Node = appData[l1].subButtons[l2]; let name2 = l2Node.name;
                         if(l2Node.fullImgData) { let imgName = l2Node.imageId + "_L2.jpg"; imgFolder.file(imgName, l2Node.fullImgData.split(',')[1], {base64: true}); thumbFolder.file(imgName, l2Node.thumbData.split(',')[1], {base64: true}); stateData[l1].subButtons[l2].fullImgData = null; stateData[l1].subButtons[l2].thumbData = null; }
                         let l3Keys = Object.keys(l2Node.subSubButtons);
-                        if (l3Keys.length === 0) csvContent += `"${name1}","${name2}","","","","","","","",""\n`;
+                        if (l3Keys.length === 0) csvContent += `"${name1}","${name2}","","","","","","","","",""\n`;
                         else {
                             for (let l3 of l3Keys) {
                                 let l3Node = l2Node.subSubButtons[l3]; let name3 = l3Node.name;
                                 let profiles = l3Node.profiles; let stateProfiles = stateData[l1].subButtons[l2].subSubButtons[l3].profiles;
-                                if (profiles.length === 0) csvContent += `"${name1}","${name2}","${name3}","","","","","","",""\n`;
+                                if (profiles.length === 0) csvContent += `"${name1}","${name2}","${name3}","","","","","","","",""\n`;
                                 else {
                                     profiles.forEach((p, index) => {
                                         let imgName = p.imageId + ".jpg";
-                                        csvContent += `"${name1}","${name2}","${name3}","${p.bio.name || ''}","${p.bio.relation || ''}","${p.bio.fatherName || ''}","${p.bio.motherName || ''}","${p.bio.age || ''}","${p.bio.mobileNo || ''}","${p.fullImgData ? imgName : 'No Image'}"\n`;
+                                        let cleanBio = (p.bio.biography || '').replace(/"/g, '""').replace(/\n/g, ' '); 
+                                        
+                                        csvContent += `"${name1}","${name2}","${name3}","${p.bio.name || ''}","${p.bio.relation || ''}","${p.bio.fatherName || ''}","${p.bio.motherName || ''}","${p.bio.age || ''}","${p.bio.mobileNo || ''}","${cleanBio}","${p.fullImgData ? imgName : 'No Image'}"\n`;
+                                        
                                         if (p.fullImgData) imgFolder.file(imgName, p.fullImgData.split(',')[1], {base64: true});
                                         if (p.thumbData) thumbFolder.file(imgName, p.thumbData.split(',')[1], {base64: true});
                                         stateProfiles[index].fullImgData = null; stateProfiles[index].thumbData = null;
@@ -470,9 +524,10 @@
 
         function importFromZip(event) {
             let file = event.target.files[0]; if (!file) return;
-            let pass1 = prompt("ਡਾਟਾ ਸੁਰੱਖਿਅਤ ਰੱਖਣ ਲਈ ਨਵਾਂ ਪਾਸਵਰਡ ਬਣਾਓ:"); if(!pass1) { document.getElementById('zip-upload').value = ""; return; }
-            let pass2 = prompt("ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਭਰੋ:"); if(pass1 !== pass2) { alert("ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ!"); document.getElementById('zip-upload').value = ""; return; }
-            localStorage.setItem('appPassword', pass1);
+            let pass1 = prompt("ਡਾਟਾ ਸੁਰੱਖਿਅਤ ਰੱਖਣ ਲਈ ਨਵਾਂ ਪਾਸਵਰਡ ਬਣਾਓ (ਜੇ ਪਹਿਲਾਂ ਬਣਿਆ ਹੈ ਤਾਂ ਉਹੀ ਭਰੋ):"); if(!pass1) { document.getElementById('zip-upload').value = ""; return; }
+            let savedPass = localStorage.getItem('appPassword');
+            if (savedPass) { if (pass1 !== savedPass) { alert("ਪਾਸਵਰਡ ਗਲਤ ਹੈ!"); document.getElementById('zip-upload').value = ""; return; } } 
+            else { let pass2 = prompt("ਪਾਸਵਰਡ ਦੁਬਾਰਾ ਭਰੋ:"); if(pass1 !== pass2) { alert("ਪਾਸਵਰਡ ਮੇਲ ਨਹੀਂ ਖਾਂਦੇ!"); document.getElementById('zip-upload').value = ""; return; } localStorage.setItem('appPassword', pass1); }
 
             JSZip.loadAsync(file).then(async function(zip) {
                 let stateFile = zip.file("app_state.json"); if(!stateFile) { alert("ਗਲਤ ZIP ਫਾਈਲ!"); return; }
@@ -488,7 +543,10 @@
                         }
                     }
                 }
-                saveToLocal(); alert("ਡਾਟਾ ਸਫ਼ਲਤਾਪੂਰਵਕ ਅੱਪਲੋਡ ਹੋ ਗਿਆ!"); renderLevel1(); document.getElementById('zip-upload').value = ""; 
+                saveToLocal(); alert("ਡਾਟਾ ਸਫ਼ਲਤਾਪੂਰਵਕ ਅੱਪਲੋਡ ਹੋ ਗਿਆ!"); 
+                document.querySelectorAll('.window-view').forEach(w => w.classList.remove('active-window')); document.getElementById('window1').classList.add('active-window');
+                currentL1Id = null; currentL2Id = null; currentL3Id = null;
+                renderLevel1(); document.getElementById('zip-upload').value = ""; 
             }).catch(err => { alert("ZIP ਪੜ੍ਹਨ ਵਿੱਚ ਗਲਤੀ: " + err); });
         }
     </script>
